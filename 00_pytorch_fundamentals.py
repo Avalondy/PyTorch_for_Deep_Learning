@@ -1,5 +1,7 @@
 # %% Import and test GPU
 from os import times
+from numpy._core.records import array
+from numpy._core.umath import numpy
 import torch
 print(torch.__version__)
 print(torch.cuda.is_available())
@@ -136,3 +138,58 @@ print(x_unsqueezed, x_unsqueezed.shape)
 x_original = torch.rand(size=(224, 224, 3))
 print(f"Original shape: {x_original.shape}")
 print(f"Permuted shape: {x_original.permute(dims=(2, 0, 1)).shape}")
+
+# %% Indexing
+x = torch.arange(1, 10).reshape(1, 3, 3)
+print(x, x.shape)
+print(x[0], x[0][0], x[0][0][0])
+print(x[:, 0], x[:, :, 1])
+print(x[0, 0, :])
+print(x[0, 2, 2], x[0, :, 2])
+
+# %% PyTorch tensors and NumPy
+import torch
+import numpy as np
+array = np.arange(1.0, 8.0)
+# numpy to torch
+tensor = torch.from_numpy(array) # notice numpy default dtype is float64
+array, tensor
+# torch tensor to numpy array
+tensor = torch.ones(7)
+numpy_tensor = tensor.numpy()
+tensor, numpy_tensor
+
+# %% Reproducbility (trying to take random out of random)
+random_tensor_A = torch.rand(3, 4)
+random_tensor_B = torch.rand(3, 4)
+print(random_tensor_A == random_tensor_B)
+
+# set random seed
+RANDOM_SEED = 42
+torch.manual_seed(RANDOM_SEED)
+random_tensor_C = torch.rand(3, 4)
+torch.manual_seed(RANDOM_SEED)
+random_tensor_D = torch.rand(3, 4)
+print(random_tensor_C)
+print(random_tensor_D)
+print(random_tensor_C == random_tensor_D)
+
+# %% Running tensors and PyTorch objects on the GPUs (and making faster computations)
+# check if GPU is available
+print(torch.cuda.is_available())
+# setup device agnostic code
+device = "cuda" if torch.cuda.is_available() else "cpu"
+# count the number of GPUs
+print(torch.cuda.device_count())
+
+# %% Putting tensors on the GPU
+# default device is CPU
+tensor = torch.tensor([1, 2, 3])
+print(tensor, tensor.device)
+# move tensor to GPU (if available)
+tensor_on_gpu = tensor.to(device)
+print(tensor_on_gpu, tensor_on_gpu.device)
+# if tensor is on GPU, cannot transfer it to numpy
+# so need to move tensor back to CPU
+tensor_back_on_cpu = tensor_on_gpu.to("cpu").numpy()
+print(tensor_back_on_cpu, tensor_back_on_cpu.device)
