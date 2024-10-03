@@ -118,20 +118,26 @@ Steps:
 -- 5. Optimizer step (gradient descent) - use the optimizer to adjust the parameters of the model to minimize the loss
 '''
 # an epoch is a single pass through the data
-epochs = 10
+epochs = 200
+torch.manual_seed(42)
+
+# Track epoch, loss and test loss
+epoch_count = []
+train_loss_values = []
+test_loss_values = []
 
 # 0. Loop through the data
 for epoch in range(epochs):
     # Set the model to training mode
     # train mode in PyTorch sets all parameters that require gradients to require gradients
     model_0.train()
-    # model_0.eval() # turns off gradient tracking
 
     # 1. Forward pass
     y_pred = model_0(X_train)
 
     # 2. Calculate loss
     loss = loss_fn(y_pred, y_train)
+    # print(f"Loss: {loss}")
 
     # 3. Optimizer zero grad
     optimizer.zero_grad() # need to zero out due to accumulation
@@ -141,3 +147,73 @@ for epoch in range(epochs):
 
     # 5. Step the optimizer
     optimizer.step() # by default how the optimizer changes will accumulate through the loop
+
+    # Testing
+    model_0.eval() # turns off different settings in the model not needed for evaluation/testing (dropout/batch norm layers...)
+    with torch.inference_mode(): # turns off gradient tracking and extra things behind the scenes
+        # 1. Forward pass
+        test_pred = model_0(X_test)
+        # 2. Calculate loss
+        test_loss = loss_fn(test_pred, y_test)
+
+    if epoch % 10 == 0:
+        epoch_count.append(epoch)
+        train_loss_values.append(loss.item())
+        test_loss_values.append(test_loss.item())
+        print(f"Epoch {epoch} | Loss: {loss} | Test Loss: {test_loss}")
+        # Print the model's state_dict
+        print(model_0.state_dict())
+
+# make predictions using `torch.inference_mode()`
+with torch.inference_mode():
+    y_preds_new = model_0(X_test)
+
+plot_predictions(prediction=y_preds_new)
+
+# %% Plotting the training and test loss
+plt.plot(epoch_count, train_loss_values, label="Train Loss")
+plt.plot(epoch_count, test_loss_values, label="Test Loss")
+plt.legend(prop={"size": 14})
+plt.xlabel("Epoch")
+plt.ylabel("Loss")
+plt.title("Training and Test Loss")
+plt.show()
+
+# %% Saving a model
+''''
+-- torch.save()
+-- torch.load()
+-- torch.nn.Module.load_state_dict() - load a model's saved dictionary
+'''
+from pathlib import Path
+
+# 1. Create a directory to save the model
+MODEL_PATH = Path("models")
+MODEL_PATH.mkdir(parents=True, exist_ok=True)
+
+# 2. Create model save path
+MODEL_NAME = "01_pytorch_workflow_model_0.pt"
+MODEL_SAVE_PATH = MODEL_PATH / MODEL_NAME
+
+# 3. Save the model state dictionary
+print(f"Saving model to: {MODEL_SAVE_PATH}")
+torch.save(obj=model_0.state_dict(), f=MODEL_SAVE_PATH)
+
+
+# %% Loading a PyTorch model
+# Since we saved our model's state_dict() rather the entire model, we'll create a
+# new instance of our model class and load the saved state_dict() into that.
+
+# 1. To load in a saved state_dict, we need to create a new instance of the model class
+loaded_model_0 = LienarRegressionModel()
+
+# 2. Load the saved state_dict() into the new model
+loaded_model_0.load_state_dict(state_dict=torch.load(f=MODEL_SAVE_PATH, weights_only=True))
+loaded_model_0.state_dict()
+
+# 3. Make predictions using the loaded model
+loaded_model_0.eval()
+with torch.inference_mode():
+    y_preds_loaded = loaded_model_0(X_test)
+
+plot_predictions(prediction=y_preds_loaded)
