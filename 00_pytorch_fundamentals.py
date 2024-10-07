@@ -1,8 +1,6 @@
 # %% Import and test GPU
-from os import times
-from numpy._core.records import array
-from numpy._core.umath import numpy
 import torch
+
 print(torch.__version__)
 print(torch.cuda.is_available())
 print(torch.cuda.device_count())
@@ -30,9 +28,7 @@ matrix.ndim
 matrix.shape
 
 # %% Tensor
-tensor = torch.tensor([[[1, 2, 3, 0],
-                        [4, 5, 6, 0],
-                        [7, 8, 9, 0]]])
+tensor = torch.tensor([[[1, 2, 3, 0], [4, 5, 6, 0], [7, 8, 9, 0]]])
 tensor
 tensor.ndim
 tensor.shape
@@ -62,10 +58,12 @@ ten_zeros
 
 # %% Tensor datatypes
 # default is float32
-float_32_tensor = torch.tensor([3.0, 6.0, 9.0],
-    dtype=None, # data type of the tensor element
-    device=None, # "cpu" or "cuda"
-    requires_grad=False) # whether or not to track gradients with this tensors operators
+float_32_tensor = torch.tensor(
+    [3.0, 6.0, 9.0],
+    dtype=None,  # data type of the tensor element
+    device=None,  # "cpu" or "cuda"
+    requires_grad=False,
+)  # whether or not to track gradients with this tensors operators
 # can also be other length
 float_16_tensor = torch.tensor([3.0, 6.0, 9.0], dtype=torch.float16)
 float_16_tensor_2 = float_32_tensor.type(torch.float16)
@@ -96,7 +94,7 @@ print(tensor * tensor)
 print(tensor.matmul(tensor))
 torch.matmul(torch.rand(3, 10), torch.rand(10, 3))
 # transpose
-torch.matmul(torch.rand(3, 5), torch.rand(4, 5).T) # .T is transpose
+torch.matmul(torch.rand(3, 5), torch.rand(4, 5).T)  # .T is transpose
 
 # %% Tensor aggregation - min, max, mean, sum, etc.
 x = torch.arange(0, 100, 10)
@@ -114,7 +112,7 @@ print(x.argmin())
 print(x.argmax())
 
 # %% Reshaping, stacking, squeezing, unsqueezing and permuting tensors
-x = torch.arange(1., 10.)
+x = torch.arange(1.0, 10.0)
 print(x, x.shape)
 # reshapes input to shape (if compatible), can also use torch.Tensor.reshape().
 x_reshaped = x.reshape(9, 1)
@@ -126,7 +124,7 @@ print(z, z.shape)
 z[:, 0] = 5
 print(z, x)
 # stack tensors on top of each other
-x_stacked = torch.stack([x, x, x, x], dim = 1)
+x_stacked = torch.stack([x, x, x, x], dim=1)
 x_stacked
 # squeeze - squeezes input to remove all the dimenions with value 1.
 x_squeezed = x_reshaped.squeeze()
@@ -150,9 +148,10 @@ print(x[0, 2, 2], x[0, :, 2])
 # %% PyTorch tensors and NumPy
 import torch
 import numpy as np
+
 array = np.arange(1.0, 8.0)
 # numpy to torch
-tensor = torch.from_numpy(array) # notice numpy default dtype is float64
+tensor = torch.from_numpy(array)  # notice numpy default dtype is float64
 array, tensor
 # torch tensor to numpy array
 tensor = torch.ones(7)

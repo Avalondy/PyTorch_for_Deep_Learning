@@ -1,5 +1,4 @@
 # %% Make classification dataset
-import sklearn
 from sklearn.datasets import make_circles
 # Make 1000 samples
 n_samples = 1000
@@ -261,3 +260,93 @@ plot_decision_boundary(model_1, X_train, y_train)
 plt.subplot(1, 2, 2)
 plt.title("Test")
 plot_decision_boundary(model_1, X_test, y_test)
+
+
+
+# %% The missing piece: non-linearity
+
+# Recreate non-linear data
+import matplotlib.pyplot as plt
+from sklearn.datasets import make_circles
+
+n_samples = 1000
+
+X, y = make_circles(n_samples=n_samples, noise=0.03, random_state=42)
+plt.scatter(X[:, 0], X[:, 1], c=y, cmap=plt.cm.RdYlBu)
+
+# Convert data to tensors and then to train and test splits
+import torch
+from sklearn.model_selection import train_test_split
+
+X = torch.from_numpy(X).type(torch.float32)
+y = torch.from_numpy(y).type(torch.float32)
+
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+# Build a model with non-linear activation functions
+from torch import nn
+class CircleModelV2(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.layer_1 = nn.Linear(in_features=2, out_features=10)
+        self.layer_2 = nn.Linear(in_features=10, out_features=10)
+        self.layer_3 = nn.Linear(in_features=10, out_features=1)
+        self.relu = nn.ReLU() # a non-linear activation function
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return self.layer_3(self.relu(self.layer_2(self.relu(self.layer_1(x)))))
+
+model_3 = CircleModelV2().to(device)
+
+# Loss function and optimizer
+loss_fn = nn.BCEWithLogitsLoss()
+optimizer = torch.optim.SGD(model_3.parameters(), lr=0.1)
+
+# %% Training a model with non-linearity
+torch.manual_seed(42)
+torch.cuda.manual_seed(42)
+epochs = 1000
+
+X_train, y_train = X_train.to(device), y_train.to(device)
+X_test, y_test = X_test.to(device), y_test.to(device)
+
+for epoch in range(epochs):
+    model_3.train()
+    # Forward pass
+    y_logits = model_3(X_train).squeeze()
+    y_pred = torch.round(torch.sigmoid(y_logits))
+    # Calculate loss/accuracy
+    loss = loss_fn(y_logits, y_train)
+    acc = accuracy_fn(y_pred=y_pred, y_true=y_train)
+    # Optimizer zero gradients
+    optimizer.zero_grad()
+    # Back propgation
+    loss.backward()
+    # Step optimizer
+    optimizer.step()
+
+    # Test
+    model_3.eval()
+    with torch.inference_mode():
+        # Forward pass
+        y_logits_test = model_3(X_test).squeeze()
+        y_pred_test = torch.round(torch.sigmoid(y_logits_test))
+        # Calculate loss/accuracy
+        loss_test = loss_fn(y_logits_test, y_test)
+        acc_test = accuracy_fn(y_pred=y_pred_test, y_true=y_test)
+
+    # Print out the results
+    if epoch % 100 == 0:
+        print(f"Epoch: {epoch} | Loss: {loss:.5f}, Acc: {acc:.4f} | Test loss: {loss_test:.5f}, Test acc: {acc_test:.4f}")
+
+# %% Plot decision boundaries
+plt.figure(figsize=(12, 3.5))
+plt.subplot(1, 3, 1)
+plt.title("Train")
+plot_decision_boundary(model_3, X_train, y_train)
+plt.subplot(1, 3, 2)
+plt.title("Test")
+plot_decision_boundary(model_3, X_test, y_test)
+plt.subplot(1, 3, 3)
+plt.title("Train - Linear")
+plot_decision_boundary(model_1, X_train, y_train)
