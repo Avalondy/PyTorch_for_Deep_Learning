@@ -437,3 +437,246 @@ model_1_results = eval_model(
     device=device,
 )
 model_0_results, model_1_results
+
+
+# %% Build a Convolutional Neural Network (CNN)
+# CNN's are known for their ability to learn patterns in visual data
+class FashionMNISTModelV2(nn.Module):
+    """
+    Model atchitecture that replicates the TinyVGG model from CNN explainer website
+    """
+
+    def __init__(self, input_shape: int, hidden_units: int, output_shape: int):
+        super().__init__()
+        self.conv_block_1 = nn.Sequential(
+            nn.Conv2d(
+                in_channels=input_shape,
+                out_channels=hidden_units,
+                kernel_size=3,
+                stride=1,
+                padding=1,
+            ),
+            nn.ReLU(),
+            nn.Conv2d(
+                in_channels=hidden_units,
+                out_channels=hidden_units,
+                kernel_size=3,
+                stride=1,
+                padding=1,
+            ),
+            nn.ReLU(),
+            nn.MaxPool2d(kernel_size=2),
+        )
+        self.conv_block_2 = nn.Sequential(
+            nn.Conv2d(
+                in_channels=hidden_units,
+                out_channels=hidden_units,
+                kernel_size=3,
+                stride=1,
+                padding=1,
+            ),
+            nn.ReLU(),
+            nn.Conv2d(
+                in_channels=hidden_units,
+                out_channels=hidden_units,
+                kernel_size=3,
+                stride=1,
+                padding=1,
+            ),
+            nn.ReLU(),
+            nn.MaxPool2d(kernel_size=2),
+        )
+        self.classifier = nn.Sequential(
+            nn.Flatten(),
+            nn.Linear(
+                in_features=hidden_units * 7 * 7, out_features=output_shape
+            ),
+        )
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        x = self.conv_block_1(x)
+        # print(f"Output shape of conv_block_1: {x.shape}")
+        x = self.conv_block_2(x)
+        # print(f"Output shape of conv_block_2: {x.shape}")
+        x = self.classifier(x)
+        # print(f"Output shape of classifier: {x.shape}")
+        return x
+
+
+torch.manual_seed(42)
+model_2 = FashionMNISTModelV2(
+    input_shape=1,
+    hidden_units=10,
+    output_shape=len(class_names),
+).to(device)
+model_2
+
+
+# %% Step through `nn.Conv2d()`
+
+torch.manual_seed(42)
+# Create a batch of images
+images = torch.randn(size=(32, 3, 64, 64))
+test_image = images[0]
+print(f"Image batch shape: {images.shape}")
+print(f"Test image shape: {test_image.shape}")
+
+# Create a single Conv2d layer
+conv_layer = nn.Conv2d(
+    in_channels=3, out_channels=10, kernel_size=3, stride=1, padding=0
+)
+conv_output = conv_layer(test_image)
+conv_output.shape
+
+
+# %% Step through `nn.MaxPool2d()`
+
+print(f"Test image shape: {test_image.shape}")
+
+# Create a sample MaxPool2d layer
+maxpool_layer = nn.MaxPool2d(kernel_size=2)
+
+# data -> conv_layer -> maxpool_layer
+test_image_through_conv = conv_layer(test_image)
+print(f"Test image shape after conv_layer: {test_image_through_conv.shape}")
+test_image_through_maxpool = maxpool_layer(test_image_through_conv)
+print(
+    f"Test image shape after maxpool_layer: {test_image_through_maxpool.shape}"
+)
+
+
+# %% Test our CNN model with a dummy image
+# Create a dummy image
+dummy_image = torch.randn(size=(1, 1, 28, 28)).to(device)
+model_2(dummy_image)
+
+
+# %% Train our CNN model with the FashionMNIST dataset
+# Setup loss, optimizer and evaluation metrics
+loss_fn = nn.CrossEntropyLoss()
+optimizer = torch.optim.SGD(params=model_2.parameters(), lr=0.1)
+accuracy_fn
+
+# Measure the time
+train_time_start_model_2 = timer()
+
+# Training and testing the model using train_step() and test_step() functions
+torch.manual_seed(42)
+torch.cuda.manual_seed(42)
+epochs = 3
+
+for epoch in tqdm(range(epochs)):
+    print(f"Epoch: {epoch}\n------")
+    train_step(
+        model=model_2,
+        data_loader=train_dataloader,
+        loss_fn=loss_fn,
+        optimizer=optimizer,
+        accuracy_fn=accuracy_fn,
+        device=device,
+    )
+    test_step(
+        model=model_2,
+        data_loader=test_dataloader,
+        loss_fn=loss_fn,
+        accuracy_fn=accuracy_fn,
+        device=device,
+    )
+
+train_time_end_model_2 = timer()
+total_train_time_model_2 = print_train_time(
+    start=train_time_start_model_2,
+    end=train_time_end_model_2,
+    device=next(model_2.parameters()).device,
+)
+model_2_results = eval_model(
+    model=model_2,
+    data_loader=test_dataloader,
+    loss_fn=loss_fn,
+    accuracy_fn=accuracy_fn,
+    device=next(model_2.parameters()).device,
+)
+
+# %% Compare the results and training times from the three models
+import pandas as pd
+
+compare_results = pd.DataFrame(
+    [
+        model_0_results,
+        model_1_results,
+        model_2_results,
+    ]
+)
+compare_results["training_time"] = [
+    total_train_time_model_0,
+    total_train_time_model_1,
+    total_train_time_model_2,
+]
+compare_results
+
+compare_results.set_index("model_name")["model_acc"].plot(kind="barh")
+plt.xlabel("accuracy (%)")
+plt.ylabel("model")
+
+
+# %% Make and evaluate random predictions with the best model
+def make_predictions(
+    model: torch.nn.Module,
+    data: list,
+    device: torch.device = device,
+):
+    pred_probs = []
+    model.to(device)
+    model.eval()
+    with torch.inference_mode():
+        for sample in data:
+            # Prepare the sample (add a batch dimension and put on target device)
+            sample = torch.unsqueeze(sample, dim=0).to(device)
+
+            # Forward pass
+            pred_logit = model(sample)
+            # Get the probabilities
+            pred_prob = pred_logit.softmax(dim=1).squeeze()
+            pred_probs.append(pred_prob.cpu())
+
+    # Stack the probabilities into a single tensor
+    return torch.stack(pred_probs)
+
+
+# Pick some sample images from the test_data for testing
+import random
+
+random.seed(42)
+test_samples = []
+test_labels = []
+for sample, label in random.sample(list(test_data), k=9):
+    test_samples.append(sample)
+    test_labels.append(label)
+
+# plt.imshow(test_samples[0].squeeze(), cmap="gray")
+# plt.title(class_names[test_labels[0]])
+
+
+# Make predictions
+pred_probs = make_predictions(model=model_2, data=test_samples)
+pred_classes = pred_probs.argmax(dim=1)
+pred_classes
+
+# Plot predictions
+plt.figure(figsize=(9, 9))
+nrows = 3
+ncols = 3
+for i, sample in enumerate(test_samples):
+    plt.subplot(nrows, ncols, i + 1)
+    plt.imshow(sample.squeeze(), cmap="gray")
+    pred_label = class_names[pred_classes[i]]
+    true_label = class_names[test_labels[i]]
+    title_text = f"Pred: {pred_label} | True: {true_label}"
+    # Check if the prediction is correct and change the title color accordingly
+    if pred_label == true_label:
+        title_color = "green"
+    else:
+        title_color = "red"
+    plt.title(title_text, fontsize=10, color=title_color)
+    plt.axis(False)
+plt.tight_layout()
