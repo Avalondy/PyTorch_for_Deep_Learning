@@ -13,10 +13,14 @@
 from timeit import default_timer as timer
 
 import matplotlib.pyplot as plt
+import pandas as pd
 import torch
 import torchvision
 from torch import nn
 from torch.utils.data import DataLoader
+
+# Import tqdm for progress bar
+from tqdm.auto import tqdm
 
 from helper_functions import accuracy_fn
 
@@ -184,9 +188,6 @@ print_train_time(start=start_time, end=end_time, device="cpu")
 # 3. Loop through testing batches, perform testing steps, calculate the test loss per batch
 # 4. Print out results
 # 5. Time all
-
-# Import tqdm for progress bar
-from tqdm.auto import tqdm
 
 # Set the seed and start the timer
 torch.manual_seed(42)
@@ -598,8 +599,6 @@ model_2_results = eval_model(
 )
 
 # %% Compare the results and training times from the three models
-import pandas as pd
-
 compare_results = pd.DataFrame(
     [
         model_0_results,
@@ -679,4 +678,78 @@ for i, sample in enumerate(test_samples):
         title_color = "red"
     plt.title(title_text, fontsize=10, color=title_color)
     plt.axis(False)
-plt.tight_layout()
+
+
+# %% Make a confusion matrix to evaluate the predictions
+
+# Make predictions with the trained model
+y_preds = []
+model_2.eval()
+with torch.inference_mode():
+    for X, y in tqdm(test_dataloader, desc="Making predictions..."):
+        # Send the data to the device
+        X, y = X.to(device), y.to(device)
+        y_logit = model_2(X)
+        y_pred = torch.softmax(y_logit.squeeze(), dim=1).argmax(dim=1)
+        y_preds.append(y_pred.cpu())
+
+# Concatenate the list of predictions into a single tensor
+y_pred_tensor = torch.cat(y_preds)
+# len(y_pred_tensor)
+
+# Import modules
+from mlxtend.plotting import plot_confusion_matrix
+from torchmetrics import ConfusionMatrix
+
+confmat = ConfusionMatrix(task="multiclass", num_classes=len(class_names))
+confmat_tensor = confmat(preds=y_pred_tensor, target=test_data.targets)
+
+# Plot the confusion matrix
+fig, ax = plot_confusion_matrix(
+    conf_mat=confmat_tensor.numpy(),
+    class_names=class_names,
+    figsize=(10, 7),
+)
+
+
+# %% Save a model
+from pathlib import Path
+
+MODEL_PATH = Path("models")
+MODEL_PATH.mkdir(parents=True, exist_ok=True)
+MODEL_NAME = "03_pytorch_computer_vision_model_2.pt"
+MODEL_SAVE_PATH = MODEL_PATH / MODEL_NAME
+
+# Save the model state dict
+print(f"Saving model to {MODEL_SAVE_PATH}")
+torch.save(obj=model_2.state_dict(), f=MODEL_SAVE_PATH)
+
+
+# %% Load a model
+torch.manual_seed(42)
+loaded_model_2 = FashionMNISTModelV2(
+    input_shape=1,
+    hidden_units=10,
+    output_shape=len(class_names),
+)
+loaded_model_2.load_state_dict(torch.load(f=MODEL_SAVE_PATH, weights_only=True))
+loaded_model_2.to(device)
+
+# %% Evaluate the loaded model
+torch.manual_seed(42)
+
+loaded_model_2_results = eval_model(
+    model=loaded_model_2,
+    data_loader=test_dataloader,
+    loss_fn=loss_fn,
+    accuracy_fn=accuracy_fn,
+    device=device,
+)
+loaded_model_2_results, model_2_results
+
+
+# %% Compare the results
+torch.isclose(
+    torch.tensor(model_2_results["model_loss"]),
+    torch.tensor(loaded_model_2_results["model_loss"]),
+)
