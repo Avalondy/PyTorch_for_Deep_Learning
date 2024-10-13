@@ -123,7 +123,8 @@ def plot_transformed_images(image_paths: list, transform, n=3, seed=None):
     if seed:
         random.seed(seed)
     for i in range(n):
-        with Image.open(random.choice(image_paths)) as f:
+        image_path = random.choice(image_paths)
+        with Image.open(image_path) as f:
             fig, ax = plt.subplots(nrows=1, ncols=2)
             ax[0].imshow(f)
             ax[0].set_title(f"Original\nSize: {f.size}")
@@ -250,4 +251,33 @@ display_random_images(
 )
 
 
-# % Data augmentation - artificially adding diversity to the training data
+# %% Data augmentation - artificially adding diversity to the training data
+# This is done by applying various transformations to the original dataset
+
+# Test with torchvision.transforms.trivialaugment
+from torchvision import transforms
+
+train_transform = transforms.Compose(
+    transforms=[
+        transforms.Resize(size=(224, 224)),
+        transforms.TrivialAugmentWide(num_magnitude_bins=31),
+        transforms.ToTensor(),
+    ]
+)
+test_transform = transforms.Compose(
+    transforms=[
+        transforms.Resize(size=(224, 224)),
+        transforms.ToTensor(),
+    ]
+)
+
+image_path_list = list(image_path.glob("*/*/*.jpg"))
+image_path_list[:10]
+
+
+plot_transformed_images(
+    image_paths=image_path_list,
+    transform=train_transform,
+    n=3,
+    seed=None,
+)
